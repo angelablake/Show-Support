@@ -1,0 +1,3 @@
+This plugin uses a sound file from Mixkit, available under Mixkit's Free license. [Find license details on Mixkit's website.](https://mixkit.co/license/#sfxFree)
+
+Code was written with assistance from ChatGPT.

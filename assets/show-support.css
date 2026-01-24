@@ -1,0 +1,71 @@
+/* Sticky "Show Support" button */
+.show-support-btn {
+    font-size: 2rem;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 50%;
+    padding: .9rem .9rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, opacity 0.12s ease-out;
+    opacity: 0.95;
+}
+
+.show-support-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    opacity: 1;
+}
+
+/* Confetti hearts */
+.show-support-confetti {
+    position: fixed;
+    /* We'll set top/left in JS to match the button center */
+    font-size: 2rem;
+    pointer-events: none;
+    will-change: transform, opacity;
+    z-index: 10000;
+
+    /* Start centered on the spawn point; we'll move from here */
+    transform: translate(-50%, -50%);
+    animation: show-support-burst 800ms ease-out forwards;
+}
+
+@keyframes show-support-burst {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        /* JS will set --dx / --dy per emoji to control direction */
+        transform: translate(
+            calc(-50% + var(--dx, 0px)),
+            calc(-50% + var(--dy, -60px))
+        ) scale(0.8);
+        opacity: 0;
+    }
+}
+
+.show-support-wrapper {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Count label above the button */
+.show-support-count {
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}

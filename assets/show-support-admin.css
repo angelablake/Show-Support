@@ -1,0 +1,78 @@
+/* Wrap spacing */
+.show-support-settings-wrap {
+    max-width: 900px;
+}
+
+/* Tabs */
+.show-support-tabs {
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+h2.nav-tab-wrapper.show-support-tabs {
+    border-bottom: none;
+}
+
+.show-support-tabs .nav-tab {
+    font-size: 16px !important;
+    background-color: rgba(0,0,0,0.0);
+    font-size: 13px;
+    padding: 8px 16px;
+    border: none;
+}
+
+.show-support-tabs .nav-tab.nav-tab-active {
+    color: #2271b1;
+    border-bottom: 3px solid #2271b1;
+}
+
+.show-support-tabs .nav-tab.nav-tab-active {
+    color: var(--wp-admin-theme-color, #2271b1);
+    border-bottom: 3px solid var(--wp-admin-theme-color, #2271b1);
+}
+
+/* Card container */
+.show-support-settings-card {
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.02);
+}
+
+/* Reset card tweaks */
+.show-support-reset-card h2 {
+    margin-top: 0;
+}
+
+/* Tighter form spacing inside card */
+.show-support-settings-card form .form-table {
+    margin-top: 0;
+}
+
+.show-support-settings-card form .form-table th {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.show-support-settings-card form .form-table td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+/* Code blocks in How to Use tab */
+.show-support-tab-panel-howto pre {
+    background: #f8f9fa;
+    border: 1px solid #e2e4e7;
+    border-radius: 3px;
+    padding: 10px 12px;
+    overflow: auto;
+    font-size: 12px;
+}
+
+/* Small spacing adjustment for list under How to Use */
+.show-support-tab-panel-howto ul {
+    list-style: disc;
+    margin-left: 20px;
+}
