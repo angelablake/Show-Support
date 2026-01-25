@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Show Support
  * Description: Adds a sticky emoji button that triggers a celebratory burst and counts user support.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Angela Blake
  * Text Domain: show-support
  */
