@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Show Support
  * Description: Adds a sticky emoji button that triggers a celebratory burst and counts user support.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Angela Blake
  * Text Domain: show-support
  */
@@ -18,6 +18,19 @@ if ( ! defined( 'SHOW_SUPPORT_PLUGIN_BASENAME' ) ) {
 if ( ! defined( 'SHOWSUPPORT_OPTION_DELETE_ON_UNINSTALL' ) ) {
 	define( 'SHOWSUPPORT_OPTION_DELETE_ON_UNINSTALL', 'showsupport_delete_data_on_uninstall' );
 }
+
+// Include the Plugin Update Checker library.
+require_once plugin_dir_path( __FILE__ ) . 'includes/plugin-update-checker/plugin-update-checker.php';
+
+// Set up the update checker.
+$show_support_update_checker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+    'https://github.com/angelablake/Show-Support', // Repo URL
+    __FILE__,                                                 // Main plugin file
+    'show-support'                                            // Plugin slug (folder name)
+);
+
+// Default branch is "main" instead of "master".
+$show_support_update_checker->setBranch( 'main' );
 
 class Show_Support {
 
