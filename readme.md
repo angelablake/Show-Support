@@ -15,7 +15,7 @@ Visitors can show their support for you or your content by clicking the button a
 - Compatible with themes and page builders
 - No cookies or tracking required
 
-## Who it's for
+### Who it's for
 
 Show Support is for anyone who wants to add a little joy and interaction to their WordPress website. It is most useful for personal sites and portfolios, where you can be a little quirky.
 
