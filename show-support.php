@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Show Support
  * Description: Adds a sticky emoji button that triggers a celebratory burst and counts user support.
- * Version: 1.0.3
+ * Version: 1.1.4
  * Author: Angela Blake
  * Text Domain: show-support
  */
@@ -13,6 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! defined( 'SHOW_SUPPORT_PLUGIN_BASENAME' ) ) {
     define( 'SHOW_SUPPORT_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+}
+
+if ( ! defined( 'SHOW_SUPPORT_VERSION' ) ) {
+    define( 'SHOW_SUPPORT_VERSION', '1.1.4' );
 }
 
 if ( ! defined( 'SHOWSUPPORT_OPTION_DELETE_ON_UNINSTALL' ) ) {
@@ -87,14 +91,14 @@ class Show_Support {
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/show-support.css',
             [],
-            '1.0.0'
+            SHOW_SUPPORT_VERSION
         );
 
         wp_enqueue_script(
             $handle,
             plugin_dir_url( __FILE__ ) . 'assets/show-support.js',
             [],
-            '1.0.1',
+            SHOW_SUPPORT_VERSION,
             true
         );
 
@@ -108,6 +112,7 @@ class Show_Support {
                 'restUrl'      => esc_url_raw( rest_url( 'show-support/v1/click' ) ),
                 'nonce'        => wp_create_nonce( 'wp_rest' ),
                 'emoji'        => $emoji,
+                'contentId'    => is_singular() ? get_queried_object_id() : 0,
                 'soundEnabled' => ! empty( $settings['sound_enabled'] ),
                 'soundUrl'     => plugin_dir_url( __FILE__ ) . 'assets/sounds/bubble-pop-alert.mp3',
                 ]
@@ -210,6 +215,52 @@ class Show_Support {
         $count++;
 
         update_option( 'show_support_clicks', $count );
+
+        $stored_stats = get_option( 'show_support_stats', false );
+        $stats = $stored_stats;
+        if ( ! is_array( $stats ) ) {
+            $stats = [];
+        }
+
+        if ( ! isset( $stats['daily'] ) || ! is_array( $stats['daily'] ) ) {
+            $stats['daily'] = [];
+        }
+
+        if ( ! isset( $stats['content'] ) || ! is_array( $stats['content'] ) ) {
+            $stats['content'] = [];
+        }
+
+        $today = current_datetime()->format( 'Y-m-d' );
+        $stats['daily'][ $today ] = isset( $stats['daily'][ $today ] )
+            ? (int) $stats['daily'][ $today ] + 1
+            : 1;
+
+        if ( empty( $stats['started_at'] ) ) {
+            $stats['started_at'] = $today;
+            $stats['legacy_total'] = max( 0, $count - 1 );
+        }
+
+        // Keep a little more than 12 months of daily data for the dashboard chart.
+        $cutoff = current_datetime()->modify( '-400 days' )->format( 'Y-m-d' );
+        foreach ( $stats['daily'] as $date => $daily_count ) {
+            if ( $date < $cutoff ) {
+                unset( $stats['daily'][ $date ] );
+            }
+        }
+
+        $content_id = absint( $request->get_param( 'contentId' ) );
+        if ( $content_id && get_post( $content_id ) ) {
+            $stats['content'][ $content_id ] = isset( $stats['content'][ $content_id ] )
+                ? (int) $stats['content'][ $content_id ] + 1
+                : 1;
+        }
+
+        if ( false === $stored_stats ) {
+            // Stats are only needed for clicks and the admin dashboard, so don't autoload them.
+            add_option( 'show_support_stats', $stats, '', false );
+        } else {
+            update_option( 'show_support_stats', $stats );
+        }
 
         return new WP_REST_Response(
             [
@@ -583,7 +634,13 @@ class Show_Support {
      * @return array
      */
     public function add_plugin_action_links( $links ) {
-        $settings_url = admin_url( 'themes.php?page=show-support' );
+        $settings_url = add_query_arg(
+            [
+                'page' => 'show-support',
+                'tab'  => 'appearance',
+            ],
+            admin_url( 'themes.php' )
+        );
         
         $settings_link = sprintf(
             '<a href="%s">%s</a>',
@@ -612,7 +669,7 @@ class Show_Support {
             'show-support-admin',
             plugin_dir_url( __FILE__ ) . 'assets/show-support-admin.css',
             [],
-            '1.0.0'
+            SHOW_SUPPORT_VERSION
         );
     }
     
@@ -786,6 +843,7 @@ class Show_Support {
             
             // Reset the count.
             update_option( 'show_support_clicks', 0 );
+            delete_option( 'show_support_stats' );
             
             // Redirect back to the settings page.
             $redirect_url = admin_url( 'themes.php?page=show-support' );
@@ -795,6 +853,206 @@ class Show_Support {
         }
     
     /**
+     * Render the Stats dashboard.
+     */
+    private function render_stats_dashboard() {
+        $total = (int) get_option( 'show_support_clicks', 0 );
+        $stats = get_option( 'show_support_stats', [] );
+
+        if ( ! is_array( $stats ) ) {
+            $stats = [];
+        }
+
+        $daily = isset( $stats['daily'] ) && is_array( $stats['daily'] ) ? $stats['daily'] : [];
+        $content_counts = isset( $stats['content'] ) && is_array( $stats['content'] ) ? $stats['content'] : [];
+
+        $now = current_datetime();
+        $today_key = $now->format( 'Y-m-d' );
+        $today_count = isset( $daily[ $today_key ] ) ? (int) $daily[ $today_key ] : 0;
+
+        $start_of_week = (int) get_option( 'start_of_week', 0 );
+        $weekday = (int) $now->format( 'w' );
+        $days_since_week_start = ( $weekday - $start_of_week + 7 ) % 7;
+        $week_start = $now->modify( '-' . $days_since_week_start . ' days' )->format( 'Y-m-d' );
+        $month_start = $now->format( 'Y-m-01' );
+
+        $week_count = 0;
+        $month_count = 0;
+        foreach ( $daily as $date => $daily_count ) {
+            $daily_count = (int) $daily_count;
+
+            if ( $date >= $week_start && $date <= $today_key ) {
+                $week_count += $daily_count;
+            }
+
+            if ( $date >= $month_start && $date <= $today_key ) {
+                $month_count += $daily_count;
+            }
+        }
+
+        $month_labels = [];
+        $month_values = [];
+        $first_month = $now->modify( 'first day of this month' );
+
+        for ( $i = 11; $i >= 0; $i-- ) {
+            $month = $first_month->modify( '-' . $i . ' months' );
+            $key = $month->format( 'Y-m' );
+            $month_labels[] = wp_date( 'M', $month->getTimestamp(), wp_timezone() );
+            $month_values[ $key ] = 0;
+        }
+
+        foreach ( $daily as $date => $daily_count ) {
+            $month_key = substr( $date, 0, 7 );
+            if ( isset( $month_values[ $month_key ] ) ) {
+                $month_values[ $month_key ] += (int) $daily_count;
+            }
+        }
+
+        $chart_values = array_values( $month_values );
+        $largest_value = ! empty( $chart_values ) ? max( $chart_values ) : 0;
+        $chart_step = max( 1, (int) ceil( $largest_value / 4 ) );
+        $chart_max = $chart_step * 4;
+
+        $chart_left = 54;
+        $chart_top = 20;
+        $chart_width = 916;
+        $chart_height = 220;
+        $chart_bottom = $chart_top + $chart_height;
+        $points = [];
+
+        foreach ( $chart_values as $index => $value ) {
+            $x = $chart_left + ( $index * ( $chart_width / 11 ) );
+            $y = $chart_bottom - ( ( $value / $chart_max ) * $chart_height );
+            $points[] = [
+                'x' => $x,
+                'y' => $y,
+                'value' => $value,
+            ];
+        }
+
+        arsort( $content_counts, SORT_NUMERIC );
+        $top_content = array_slice( $content_counts, 0, 10, true );
+
+        $legacy_total = isset( $stats['legacy_total'] )
+            ? (int) $stats['legacy_total']
+            : ( empty( $stats['started_at'] ) ? $total : 0 );
+        ?>
+        <div class="show-support-tab-panel show-support-tab-panel-stats">
+            <div class="show-support-stat-grid">
+                <?php
+                $cards = [
+                    __( 'Total', 'show-support' ) => $total,
+                    __( 'Today', 'show-support' ) => $today_count,
+                    __( 'This Week', 'show-support' ) => $week_count,
+                    __( 'This Month', 'show-support' ) => $month_count,
+                ];
+
+                foreach ( $cards as $label => $value ) :
+                    ?>
+                    <div class="show-support-stat-card">
+                        <div class="show-support-stat-label"><?php echo esc_html( $label ); ?></div>
+                        <div class="show-support-stat-value"><?php echo esc_html( number_format_i18n( $value ) ); ?></div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="show-support-settings-card show-support-chart-card">
+                <h2><?php esc_html_e( 'Support Over Time', 'show-support' ); ?></h2>
+                <p class="description"><?php esc_html_e( 'Past 12 months', 'show-support' ); ?></p>
+
+                <div class="show-support-chart-wrap">
+                    <svg class="show-support-chart" viewBox="0 0 1000 290" role="img" aria-labelledby="show-support-chart-title">
+                        <title id="show-support-chart-title"><?php esc_html_e( 'Monthly support over the past 12 months', 'show-support' ); ?></title>
+
+                        <?php for ( $grid_index = 0; $grid_index <= 4; $grid_index++ ) : ?>
+                            <?php
+                            $grid_y = $chart_top + ( $grid_index * ( $chart_height / 4 ) );
+                            $grid_value = $chart_max - ( $grid_index * $chart_step );
+                            ?>
+                            <line class="show-support-chart-gridline" x1="<?php echo esc_attr( $chart_left ); ?>" y1="<?php echo esc_attr( $grid_y ); ?>" x2="970" y2="<?php echo esc_attr( $grid_y ); ?>"></line>
+                            <text class="show-support-chart-y-label" x="42" y="<?php echo esc_attr( $grid_y + 4 ); ?>" text-anchor="end"><?php echo esc_html( number_format_i18n( $grid_value ) ); ?></text>
+                        <?php endfor; ?>
+
+                        <polyline
+                            class="show-support-chart-line"
+                            points="<?php echo esc_attr( implode( ' ', array_map( function ( $point ) { return $point['x'] . ',' . $point['y']; }, $points ) ) ); ?>"
+                        ></polyline>
+
+                        <?php foreach ( $points as $index => $point ) : ?>
+                            <circle class="show-support-chart-point" cx="<?php echo esc_attr( $point['x'] ); ?>" cy="<?php echo esc_attr( $point['y'] ); ?>" r="4"></circle>
+                            <text class="show-support-chart-value" x="<?php echo esc_attr( $point['x'] ); ?>" y="<?php echo esc_attr( max( 11, $point['y'] - 10 ) ); ?>" text-anchor="middle"><?php echo esc_html( number_format_i18n( $point['value'] ) ); ?></text>
+                            <text class="show-support-chart-x-label" x="<?php echo esc_attr( $point['x'] ); ?>" y="270" text-anchor="middle"><?php echo esc_html( $month_labels[ $index ] ); ?></text>
+                        <?php endforeach; ?>
+                    </svg>
+
+                    <p class="screen-reader-text">
+                        <?php
+                        $accessible_values = [];
+                        foreach ( $chart_values as $index => $value ) {
+                            $accessible_values[] = sprintf(
+                                /* translators: 1: month label, 2: support count. */
+                                __( '%1$s: %2$s supports', 'show-support' ),
+                                $month_labels[ $index ],
+                                number_format_i18n( $value )
+                            );
+                        }
+                        echo esc_html( implode( '; ', $accessible_values ) );
+                        ?>
+                    </p>
+                </div>
+            </div>
+
+            <div class="show-support-settings-card show-support-content-card">
+                <h2><?php esc_html_e( 'Most-Supported Content', 'show-support' ); ?></h2>
+                <table class="widefat striped show-support-content-table">
+                    <thead>
+                        <tr>
+                            <th scope="col"><?php esc_html_e( 'Content', 'show-support' ); ?></th>
+                            <th scope="col"><?php esc_html_e( 'Type', 'show-support' ); ?></th>
+                            <th scope="col" class="show-support-count-column"><?php esc_html_e( 'Supports', 'show-support' ); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ( empty( $top_content ) ) : ?>
+                            <tr>
+                                <td colspan="3"><?php esc_html_e( 'No support has been recorded on individual content yet.', 'show-support' ); ?></td>
+                            </tr>
+                        <?php else : ?>
+                            <?php foreach ( $top_content as $content_id => $support_count ) : ?>
+                                <?php
+                                $post = get_post( $content_id );
+                                $title = $post ? get_the_title( $post ) : sprintf( __( 'Deleted content #%d', 'show-support' ), $content_id );
+                                $edit_link = $post ? get_edit_post_link( $post->ID ) : '';
+                                $post_type = $post ? get_post_type_object( $post->post_type ) : null;
+                                $type_label = $post_type ? $post_type->labels->singular_name : __( 'Deleted', 'show-support' );
+                                ?>
+                                <tr>
+                                    <td>
+                                        <?php if ( $edit_link ) : ?>
+                                            <a href="<?php echo esc_url( $edit_link ); ?>"><strong><?php echo esc_html( $title ); ?></strong></a>
+                                        <?php else : ?>
+                                            <strong><?php echo esc_html( $title ); ?></strong>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo esc_html( $type_label ); ?></td>
+                                    <td class="show-support-count-column"><?php echo esc_html( number_format_i18n( (int) $support_count ) ); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if ( $legacy_total > 0 ) : ?>
+                <p class="description show-support-stats-note">
+                    <?php esc_html_e( 'Total includes support recorded before detailed stats were introduced. Time-based and content stats begin with this version.', 'show-support' ); ?>
+                </p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
      * Render the settings page.
      */
     public function render_settings_page() {
@@ -803,16 +1061,24 @@ class Show_Support {
         }
         
         // Determine active tab.
-        $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'appearance';
-        if ( ! in_array( $active_tab, [ 'appearance', 'utilities', 'how-to' ], true ) ) {
-            $active_tab = 'appearance';
+        $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'stats';
+        if ( ! in_array( $active_tab, [ 'stats', 'appearance', 'utilities', 'how-to' ], true ) ) {
+            $active_tab = 'stats';
         }
         
         $base_url = admin_url( 'themes.php?page=show-support' );
         ?>
         <div class="wrap show-support-settings-wrap">
-            <h1><?php esc_html_e( 'Show Support Settings', 'show-support' ); ?></h1>
-            <h2 class="nav-tab-wrapper show-support-tabs">
+            <div class="show-support-admin-header">
+                <div class="show-support-admin-header-inner">
+                    <h1><?php esc_html_e( 'Show Support', 'show-support' ); ?></h1>
+                    <h2 class="nav-tab-wrapper show-support-tabs">
+                <a
+                href="<?php echo esc_url( add_query_arg( [ 'tab' => 'stats' ], $base_url ) ); ?>"
+                class="nav-tab <?php echo ( 'stats' === $active_tab ) ? 'nav-tab-active' : ''; ?>"
+                >
+                <?php esc_html_e( 'Stats', 'show-support' ); ?>
+            </a>
                 <a
                 href="<?php echo esc_url( add_query_arg( [ 'tab' => 'appearance' ], $base_url ) ); ?>"
                 class="nav-tab <?php echo ( 'appearance' === $active_tab ) ? 'nav-tab-active' : ''; ?>"
@@ -829,9 +1095,17 @@ class Show_Support {
             >
             <?php esc_html_e( 'How to Use', 'show-support' ); ?>
         </a>
-    </h2>
+                    </h2>
+                </div>
+            </div>
+
+            <div class="show-support-admin-content">
     
-    <?php if ( 'appearance' === $active_tab ) : ?>
+    <?php if ( 'stats' === $active_tab ) : ?>
+
+        <?php $this->render_stats_dashboard(); ?>
+
+    <?php elseif ( 'appearance' === $active_tab ) : ?>
         
         <div class="show-support-tab-panel show-support-tab-panel-appearance">
             <div class="show-support-settings-card">
@@ -861,7 +1135,7 @@ class Show_Support {
                 <div class="show-support-settings-card show-support-reset-card">
                     <h2><?php esc_html_e( 'Support Count', 'show-support' ); ?></h2>
                     <p>
-                        <?php esc_html_e( 'If you want to start over, you can reset the total Show Support count to zero.', 'show-support' ); ?>
+                        <?php esc_html_e( 'If you want to start over, you can reset the total Show Support count and all detailed stats.', 'show-support' ); ?>
                     </p>
 
                     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -930,6 +1204,7 @@ class Show_Support {
                             </div>
                             
                             <?php endif; ?>
+                        </div>
                         </div>
                         <?php
                         }
