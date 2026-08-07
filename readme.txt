@@ -8,6 +8,7 @@ Visitors can show their support for you or your content by clicking the button a
 
 - Sticky emjoji button for your site
 - Animated burst of emojis on click
+- Stats dashboard with daily, weekly, monthly, and content-level support insights
 - Optional button sound effect
 - Adjust size, color, and border
 - No cookies or tracking

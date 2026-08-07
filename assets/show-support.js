@@ -115,7 +115,9 @@
                         'Content-Type': 'application/json',
                         'X-WP-Nonce': ShowSupport.nonce
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({
+                        contentId: ShowSupport.contentId || 0
+                    })
                 });
 
                 // Optional: inspect returned total.
