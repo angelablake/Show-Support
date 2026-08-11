@@ -48,3 +48,8 @@ Styles you can adjust:
 
 Other settings you can control:
 - Opt into data removal upon uninstall or reset the click count in the Utilities tab.
+
+## Screenshot
+
+<img width="2306" height="1248" alt="Show Support screenshot" src="https://github.com/user-attachments/assets/5dd27984-04a0-47d6-a7fb-5d06c4e94868" />
+
